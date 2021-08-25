@@ -4,6 +4,9 @@ const vm = require("vm");
 
 function Require(modulePath) {
   const absolutePath = path.resolve(__dirname, modulePath);
+  if (Module._cache[absolutePath]) {
+    return Module._cache[absolutePath].exports;
+  }
   const module = new Module(absolutePath);
   module._load();
   return module.exports;
@@ -15,21 +18,23 @@ class Module {
     this.exports = {};
   }
 
+  static _cache = {};
+
   static wrapper = [
-    "(function(exports, module, Require, __dirname, __filename) {",
+    "(function(exports, Require, module, __dirname, __filename) {",
     "})",
   ];
 
   static _extensions = {
     ".js"(module) {
-      const content = fs.readFileSync(module.id, "utf-8");
+      const content = fs.readFileSync(module.id, "utf8");
       const fnStr = Module.wrapper[0] + content + Module.wrapper[1];
       const fn = vm.runInThisContext(fnStr);
       fn.call(
         module.exports,
         module.exports,
-        module,
         Require,
+        module,
         __filename,
         __dirname
       );
@@ -42,7 +47,12 @@ class Module {
 
   _load() {
     const ext = path.extname(this.id);
-    Module._extensions[ext](this);
+    try {
+      Module._extensions[ext](this);
+      Module._cache[this.id] = this;
+    } catch (error) {
+      throw error;
+    }
   }
 }
 
