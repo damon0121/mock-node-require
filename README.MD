@@ -1,0 +1,1 @@
+# 模拟node的require
